@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-composeit.composeIt",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://app.composeit.app/dashboard/api-keys"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://app.composeit.app"
+			}
+		]
+	}
+}

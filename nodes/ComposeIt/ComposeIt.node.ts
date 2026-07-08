@@ -1,7 +1,6 @@
 import {
 	NodeConnectionTypes,
 	NodeApiError,
-	NodeOperationError,
 	type INodeType,
 	type INodeTypeDescription,
 	type IExecuteFunctions,
@@ -16,6 +15,7 @@ import {
 } from 'n8n-workflow';
 
 interface PropertyDefinition {
+	id: string;
 	type: string;
 	target?: string;
 	isMany?: boolean;
@@ -27,32 +27,9 @@ interface DataSourceDefinition {
 	schema?: Record<string, PropertyDefinition>;
 }
 
-function expandDotNotation(flatObj: Record<string, unknown>): Record<string, unknown> {
-	const result: Record<string, unknown> = {};
-
-	for (const [key, value] of Object.entries(flatObj)) {
-		if (value === undefined || value === null || value === '') {
-			continue;
-		}
-		const parts = key.split('.');
-		let current = result;
-		for (let i = 0; i < parts.length; i++) {
-			const part = parts[i];
-			if (i === parts.length - 1) {
-				current[part] = value;
-			} else {
-				if (!(part in current) || typeof current[part] !== 'object' || current[part] === null) {
-					current[part] = {};
-				}
-				current = current[part] as Record<string, unknown>;
-			}
-		}
-	}
-
-	return result;
-}
-
-function parseDatasourcesToResourceMapperFields(dataSources: DataSourceDefinition[]): ResourceMapperField[] {
+function parseDatasourcesToResourceMapperFields(
+	dataSources: DataSourceDefinition[],
+): ResourceMapperField[] {
 	if (!Array.isArray(dataSources) || dataSources.length === 0) {
 		return [];
 	}
@@ -63,8 +40,9 @@ function parseDatasourcesToResourceMapperFields(dataSources: DataSourceDefinitio
 	const parseSource = (
 		currentSource: DataSourceDefinition,
 		prefix = '',
+		prefixLabel = '',
 		visited = new Set<string>(),
-		depth = 0
+		depth = 0,
 	) => {
 		if (!currentSource || !currentSource.schema) {
 			return;
@@ -81,8 +59,8 @@ function parseDatasourcesToResourceMapperFields(dataSources: DataSourceDefinitio
 				continue;
 			}
 
-			const fieldPath = prefix ? `${prefix}.${key}` : key;
-			const displayName = fieldPath;
+			const fieldPath = prefix ? `${prefix}_${property.id}` : property.id;
+			const displayName = prefixLabel ? `${prefixLabel}.${key}` : key;
 
 			if (property.type === 'relation') {
 				if (depth >= 4) {
@@ -100,7 +78,7 @@ function parseDatasourcesToResourceMapperFields(dataSources: DataSourceDefinitio
 							type: 'array',
 						});
 					} else {
-						parseSource(targetSource, fieldPath, newVisited, depth + 1);
+						parseSource(targetSource, fieldPath, displayName, newVisited, depth + 1);
 					}
 				}
 			} else {
@@ -184,22 +162,10 @@ export class ComposeIt implements INodeType {
 						description: 'Merge template with data and get the specified outputs',
 					},
 					{
-						name: 'Get',
-						value: 'get',
-						action: 'Get a template',
-						description: 'Get a single template by ID',
-					},
-					{
-						name: 'Get Many',
-						value: 'getAll',
-						action: 'Get templates',
-						description: 'Fetches a list of templates from Composeit',
-					},
-					{
 						name: 'Update',
 						value: 'update',
 						action: 'Update a template',
-						description: 'Update your template\'s properties',
+						description: "Update your template's properties",
 					},
 				],
 				default: 'generate',
@@ -216,40 +182,11 @@ export class ComposeIt implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['template'],
-						operation: ['get', 'update', 'generate'],
+						operation: ['update', 'generate'],
 					},
 				},
-				description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-			},
-			{
-				displayName: 'Return All',
-				name: 'returnAll',
-				type: 'boolean',
-				default: false,
-				displayOptions: {
-					show: {
-						resource: ['template'],
-						operation: ['getAll'],
-					},
-				},
-				description: 'Whether to return all results or only up to a given limit',
-			},
-			{
-				displayName: 'Limit',
-				name: 'limit',
-				type: 'number',
-				typeOptions: {
-					minValue: 1,
-				},
-				default: 50,
-				displayOptions: {
-					show: {
-						resource: ['template'],
-						operation: ['getAll'],
-						returnAll: [false],
-					},
-				},
-				description: 'Max number of results to return',
+				description:
+					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 			},
 			{
 				displayName: 'Name',
@@ -358,37 +295,6 @@ export class ComposeIt implements INodeType {
 				description: 'Whether to get test generation with watermark',
 			},
 			{
-				displayName: 'Data Mode',
-				name: 'dataMode',
-				type: 'options',
-				options: [
-					{ name: 'Define Below (Resource Mapper)', value: 'defineBelow' },
-					{ name: 'JSON', value: 'json' },
-				],
-				default: 'json',
-				displayOptions: {
-					show: {
-						resource: ['template'],
-						operation: ['generate'],
-					},
-				},
-				description: 'Whether to input template data as a JSON object or map individual fields dynamically',
-			},
-			{
-				displayName: 'Data JSON',
-				name: 'dataJson',
-				type: 'json',
-				default: '{}',
-				displayOptions: {
-					show: {
-						resource: ['template'],
-						operation: ['generate'],
-						dataMode: ['json'],
-					},
-				},
-				description: 'Data to merge with template (JSON object)',
-			},
-			{
 				displayName: 'Data Fields',
 				name: 'dataFields',
 				type: 'resourceMapper',
@@ -415,7 +321,6 @@ export class ComposeIt implements INodeType {
 					show: {
 						resource: ['template'],
 						operation: ['generate'],
-						dataMode: ['defineBelow'],
 					},
 				},
 				description: 'Fields schema mapped to input data',
@@ -426,13 +331,21 @@ export class ComposeIt implements INodeType {
 	methods = {
 		loadOptions: {
 			async getTemplates(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-					method: 'GET',
-					url: 'https://app.composeit.app/api/templates',
-					headers: {
-						Accept: 'application/json',
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'composeItApi',
+					{
+						method: 'GET',
+						url: 'https://app.composeit.app/api/templates',
+						qs: {
+							page: 1,
+							pageSize: 100,
+						},
+						headers: {
+							Accept: 'application/json',
+						},
 					},
-				});
+				);
 				const templates = (responseData.data || []) as IDataObject[];
 				return templates.map((t) => ({
 					name: t.name as string,
@@ -440,20 +353,24 @@ export class ComposeIt implements INodeType {
 				}));
 			},
 		},
-		resourceMapper: {
+		resourceMapping: {
 			async getTemplateFields(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
 				const templateId = this.getCurrentNodeParameter('templateId') as string;
 				if (!templateId) {
 					return { fields: [] };
 				}
 				try {
-					const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-						method: 'GET',
-						url: `https://app.composeit.app/templates/${templateId}`,
-						headers: {
-							Accept: 'application/json',
+					const responseData = await this.helpers.httpRequestWithAuthentication.call(
+						this,
+						'composeItApi',
+						{
+							method: 'GET',
+							url: `https://app.composeit.app/api/templates/${templateId}`,
+							headers: {
+								Accept: 'application/json',
+							},
 						},
-					});
+					);
 					const template = responseData as IDataObject;
 					if (!template || !template.definition) {
 						return { fields: [] };
@@ -462,7 +379,9 @@ export class ComposeIt implements INodeType {
 					if (!definition.dataSources) {
 						return { fields: [] };
 					}
-					const fields = parseDatasourcesToResourceMapperFields(definition.dataSources as DataSourceDefinition[]);
+					const fields = parseDatasourcesToResourceMapperFields(
+						definition.dataSources as DataSourceDefinition[],
+					);
 					return { fields };
 				} catch (error) {
 					throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
@@ -481,67 +400,7 @@ export class ComposeIt implements INodeType {
 				const operation = this.getNodeParameter('operation', i) as string;
 
 				if (resource === 'template') {
-					if (operation === 'getAll') {
-						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-						const limit = returnAll ? undefined : this.getNodeParameter('limit', i) as number;
-						let responseData: IDataObject[] = [];
-
-						if (returnAll) {
-							let page = 1;
-							let hasMore = true;
-							while (hasMore) {
-								const response = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-									method: 'GET',
-									url: 'https://app.composeit.app/api/templates',
-									qs: {
-										page,
-									},
-									headers: {
-										Accept: 'application/json',
-									},
-								});
-								const pageData = (response.data || []) as IDataObject[];
-								responseData.push(...pageData);
-								if (pageData.length === 0) {
-									hasMore = false;
-								} else {
-									page++;
-								}
-							}
-						} else {
-							const response = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-								method: 'GET',
-								url: 'https://app.composeit.app/api/templates',
-								qs: {
-									page: 1,
-								},
-								headers: {
-									Accept: 'application/json',
-								},
-							});
-							responseData = (response.data || []) as IDataObject[];
-						}
-
-						if (limit && responseData.length > limit) {
-							responseData = responseData.slice(0, limit);
-						}
-
-						const executionData = this.helpers.returnJsonArray(responseData).map(item => ({
-							...item,
-							pairedItem: { item: i },
-						}));
-						returnData.push(...executionData);
-					} else if (operation === 'get') {
-						const templateId = this.getNodeParameter('templateId', i) as string;
-						const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-							method: 'GET',
-							url: `https://app.composeit.app/api/templates/${templateId}`,
-							headers: {
-								Accept: 'application/json',
-							},
-						});
-						returnData.push({ json: responseData as IDataObject, pairedItem: { item: i } });
-					} else if (operation === 'update') {
+					if (operation === 'update') {
 						const templateId = this.getNodeParameter('templateId', i) as string;
 						const name = this.getNodeParameter('name', i) as string;
 						const description = this.getNodeParameter('description', i) as string;
@@ -552,44 +411,30 @@ export class ComposeIt implements INodeType {
 						if (description !== undefined && description !== '') body.description = description;
 						if (isActive !== undefined) body.isActive = isActive;
 
-						const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-							method: 'PATCH',
-							url: `https://app.composeit.app/api/templates/${templateId}`,
-							body,
-							headers: {
-								'Content-Type': 'application/json',
-								Accept: 'application/json',
+						const responseData = await this.helpers.httpRequestWithAuthentication.call(
+							this,
+							'composeItApi',
+							{
+								method: 'PATCH',
+								url: `https://app.composeit.app/api/templates/${templateId}`,
+								body,
+								headers: {
+									'Content-Type': 'application/json',
+									Accept: 'application/json',
+								},
 							},
-						});
+						);
 						returnData.push({ json: responseData as IDataObject, pairedItem: { item: i } });
 					} else if (operation === 'generate') {
 						const templateId = this.getNodeParameter('templateId', i) as string;
 						const templateVersion = this.getNodeParameter('templateVersion', i) as string;
 						const formats = this.getNodeParameter('formats', i) as string[];
-						const imageType = formats.includes('image') ? this.getNodeParameter('imageType', i) as string : undefined;
+						const imageType = formats.includes('image')
+							? (this.getNodeParameter('imageType', i) as string)
+							: undefined;
 						const isTest = this.getNodeParameter('isTest', i) as boolean;
-						const dataMode = this.getNodeParameter('dataMode', i) as string;
 
-						let data: Record<string, unknown> = {};
-						if (dataMode === 'json') {
-							const dataJson = this.getNodeParameter('dataJson', i) as unknown;
-							if (dataJson) {
-								if (typeof dataJson === 'object' && dataJson !== null) {
-									data = dataJson as Record<string, unknown>;
-								} else if (typeof dataJson === 'string') {
-									try {
-										data = JSON.parse(dataJson) as Record<string, unknown>;
-									} catch {
-										throw new NodeOperationError(this.getNode(), 'Invalid JSON in Data JSON field', { itemIndex: i });
-									}
-								}
-							}
-						} else {
-							const dataFields = this.getNodeParameter('dataFields', i) as IDataObject;
-							if (dataFields && dataFields.value) {
-								data = expandDotNotation(dataFields.value as Record<string, unknown>);
-							}
-						}
+						const data = this.getNodeParameter('dataFields', i) as IDataObject;
 
 						const body: IDataObject = {
 							templateId,
@@ -600,15 +445,19 @@ export class ComposeIt implements INodeType {
 						if (imageType) body.imageType = imageType;
 						if (isTest !== undefined) body.isTest = isTest;
 
-						const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'composeItApi', {
-							method: 'POST',
-							url: 'https://app.composeit.app/api/export',
-							body,
-							headers: {
-								'Content-Type': 'application/json',
-								Accept: 'application/json',
+						const responseData = await this.helpers.httpRequestWithAuthentication.call(
+							this,
+							'composeItApi',
+							{
+								method: 'POST',
+								url: 'https://app.composeit.app/api/export',
+								body,
+								headers: {
+									'Content-Type': 'application/json',
+									Accept: 'application/json',
+								},
 							},
-						});
+						);
 						returnData.push({ json: responseData as IDataObject, pairedItem: { item: i } });
 					}
 				}

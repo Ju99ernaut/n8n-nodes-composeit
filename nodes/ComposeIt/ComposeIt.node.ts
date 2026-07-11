@@ -63,7 +63,15 @@ function parseDatasourcesToResourceMapperFields(
 			const displayName = prefixLabel ? `${prefixLabel}.${key}` : key;
 
 			if (property.type === 'relation') {
-				if (depth >= 4) {
+				if (depth >= 1) {
+					fields.push({
+						id: fieldPath,
+						displayName: `${displayName} (Nested Data)`,
+						required: false,
+						display: true,
+						defaultMatch: false,
+						type: 'object',
+					});
 					continue;
 				}
 				const targetSource = dataSources.find((src) => src.id === property.target);
@@ -295,6 +303,27 @@ export class ComposeIt implements INodeType {
 				description: 'Whether to get test generation with watermark',
 			},
 			{
+				displayName: 'Data Input Mode',
+				name: 'inputMode',
+				type: 'options',
+				options: [
+					{ name: 'Form Builder (Simple)', value: 'form' },
+					{ name: 'Raw JSON (Advanced)', value: 'json' },
+				],
+				default: 'form',
+				description: 'Choose how you want to input variables into your template',
+			},
+			{
+				displayName: 'JSON Data',
+				name: 'jsonData',
+				type: 'json',
+				displayOptions: {
+					show: { inputMode: ['json'], resource: ['template'], operation: ['generate'] },
+				},
+				default: '{}',
+				description: 'Provide a structured nested object or map variables directly as JSON',
+			},
+			{
 				displayName: 'Data Fields',
 				name: 'dataFields',
 				type: 'resourceMapper',
@@ -319,6 +348,7 @@ export class ComposeIt implements INodeType {
 				},
 				displayOptions: {
 					show: {
+						inputMode: ['form'],
 						resource: ['template'],
 						operation: ['generate'],
 					},

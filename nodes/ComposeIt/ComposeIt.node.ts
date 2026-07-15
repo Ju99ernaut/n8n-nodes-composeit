@@ -465,11 +465,15 @@ export class ComposeIt implements INodeType {
 						const isTest = this.getNodeParameter('isTest', i) as boolean;
 
 						const data = this.getNodeParameter('dataFields', i) as IDataObject;
+						const inputMode = this.getNodeParameter('inputMode', i) as string;
 
 						const body: IDataObject = {
 							templateId,
 							formats,
-							data,
+							data: {
+								intergration: 'n8n',
+								inputData: { inputMode, ...data },
+							},
 						};
 						if (templateVersion) body.templateVersion = templateVersion;
 						if (imageType) body.imageType = imageType;

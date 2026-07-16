@@ -228,7 +228,6 @@ export class ComposeIt implements INodeType {
 					mappingMode: 'defineBelow',
 					value: null,
 				},
-				required: true,
 				typeOptions: {
 					loadOptionsDependsOn: ['templateId'],
 					resourceMapper: {
@@ -351,16 +350,21 @@ export class ComposeIt implements INodeType {
 							: undefined;
 						const isTest = this.getNodeParameter('isTest', i) as boolean;
 
-						const data = (this.getNodeParameter('dataFields', i) as IDataObject)
-							?.value as IDataObject;
 						const inputMode = this.getNodeParameter('inputMode', i) as string;
+						const isJsonInputMode = inputMode === 'json';
+						const jsonData = isJsonInputMode
+							? (this.getNodeParameter('jsonData', i) as IDataObject)
+							: {};
+						const data = !isJsonInputMode
+							? ((this.getNodeParameter('dataFields', i) as IDataObject)?.value as IDataObject)
+							: {};
 
 						const body: IDataObject = {
 							templateId,
 							formats,
 							data: {
 								integration: 'n8n',
-								inputData: { inputMode, ...data },
+								inputData: { inputMode, jsonData, ...data },
 							},
 						};
 						if (templateVersion) body.templateVersion = templateVersion;

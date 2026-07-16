@@ -1,17 +1,17 @@
 {
-	"node": "n8n-nodes-composeit.composeIt",
+	"node": "n8n-nodes-composeit.composeit",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Developer Tools"],
+	"categories": ["Document Automation"],
 	"resources": {
 		"credentialDocumentation": [
 			{
-				"url": "https://app.composeit.app/dashboard/api-keys"
+				"url": "https://docs.composeit.app/docs/api-docs"
 			}
 		],
 		"primaryDocumentation": [
 			{
-				"url": "https://app.composeit.app"
+				"url": "https://docs.composeit.app/docs"
 			}
 		]
 	}

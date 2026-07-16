@@ -8,114 +8,11 @@ import {
 	type ILoadOptionsFunctions,
 	type INodePropertyOptions,
 	type ResourceMapperFields,
-	type ResourceMapperField,
-	type FieldType,
 	type IDataObject,
 	type JsonObject,
 } from 'n8n-workflow';
-
-interface PropertyDefinition {
-	id: string;
-	type: string;
-	target?: string;
-	isMany?: boolean;
-}
-
-interface DataSourceDefinition {
-	id: string;
-	isRoot?: boolean;
-	schema?: Record<string, PropertyDefinition>;
-}
-
-function parseDatasourcesToResourceMapperFields(
-	dataSources: DataSourceDefinition[],
-): ResourceMapperField[] {
-	if (!Array.isArray(dataSources) || dataSources.length === 0) {
-		return [];
-	}
-
-	const rootSource = dataSources.find((source) => source.isRoot === true) || dataSources[0];
-	const fields: ResourceMapperField[] = [];
-
-	const parseSource = (
-		currentSource: DataSourceDefinition,
-		prefix = '',
-		prefixLabel = '',
-		visited = new Set<string>(),
-		depth = 0,
-	) => {
-		if (!currentSource || !currentSource.schema) {
-			return;
-		}
-
-		if (visited.has(currentSource.id)) {
-			return;
-		}
-		const newVisited = new Set(visited);
-		newVisited.add(currentSource.id);
-
-		for (const [key, property] of Object.entries(currentSource.schema)) {
-			if (key === 'id') {
-				continue;
-			}
-
-			const fieldPath = prefix ? `${prefix}_${property.id}` : property.id;
-			const displayName = prefixLabel ? `${prefixLabel}.${key}` : key;
-
-			if (property.type === 'relation') {
-				if (depth >= 1) {
-					fields.push({
-						id: fieldPath,
-						displayName: `${displayName} (Nested Data)`,
-						required: false,
-						display: true,
-						defaultMatch: false,
-						type: 'object',
-					});
-					continue;
-				}
-				const targetSource = dataSources.find((src) => src.id === property.target);
-				if (targetSource) {
-					if (property.isMany) {
-						fields.push({
-							id: fieldPath,
-							displayName: `${displayName} (Array of Objects)`,
-							required: false,
-							display: true,
-							defaultMatch: false,
-							type: 'array',
-						});
-					} else {
-						parseSource(targetSource, fieldPath, displayName, newVisited, depth + 1);
-					}
-				}
-			} else {
-				let fieldType: FieldType = 'string';
-				if (property.type === 'number') {
-					fieldType = 'number';
-				} else if (property.type === 'boolean') {
-					fieldType = 'boolean';
-				} else if (property.type === 'date') {
-					fieldType = 'dateTime';
-				} else if (property.type === 'json') {
-					fieldType = 'object';
-				}
-
-				fields.push({
-					id: fieldPath,
-					displayName,
-					required: false,
-					display: true,
-					defaultMatch: false,
-					type: fieldType,
-				});
-			}
-		}
-	};
-
-	parseSource(rootSource);
-	return fields;
-}
+import { parseDatasourcesToResourceMapperFields } from './helpers/utils';
+import type { DataSourceDefinition } from './helpers/interfaces';
 
 export class ComposeIt implements INodeType {
 	description: INodeTypeDescription = {
@@ -125,7 +22,7 @@ export class ComposeIt implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Consume ComposeIt API for document and template management',
+		description: 'Consume ComposeIt API for document generation and template management',
 		defaults: {
 			name: 'ComposeIt',
 		},
@@ -167,7 +64,7 @@ export class ComposeIt implements INodeType {
 						name: 'Generate',
 						value: 'generate',
 						action: 'Generate a document',
-						description: 'Merge template with data and get the specified outputs',
+						description: 'Merge template with data and get the selected outputs',
 					},
 					{
 						name: 'Update',
@@ -390,7 +287,7 @@ export class ComposeIt implements INodeType {
 					return { fields: [] };
 				}
 				try {
-					const responseData = await this.helpers.httpRequestWithAuthentication.call(
+					const template = await this.helpers.httpRequestWithAuthentication.call(
 						this,
 						'composeItApi',
 						{
@@ -401,17 +298,11 @@ export class ComposeIt implements INodeType {
 							},
 						},
 					);
-					const template = responseData as IDataObject;
-					if (!template || !template.definition) {
+					const dataSources = template?.definition?.dataSources as DataSourceDefinition[];
+					if (!dataSources || !dataSources.length) {
 						return { fields: [] };
 					}
-					const definition = template.definition as IDataObject;
-					if (!definition.dataSources) {
-						return { fields: [] };
-					}
-					const fields = parseDatasourcesToResourceMapperFields(
-						definition.dataSources as DataSourceDefinition[],
-					);
+					const fields = parseDatasourcesToResourceMapperFields(dataSources);
 					return { fields };
 				} catch (error) {
 					throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
@@ -471,7 +362,7 @@ export class ComposeIt implements INodeType {
 							templateId,
 							formats,
 							data: {
-								intergration: 'n8n',
+								integration: 'n8n',
 								inputData: { inputMode, ...data },
 							},
 						};

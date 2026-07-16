@@ -13,7 +13,7 @@ export class ComposeItApi implements ICredentialType {
 
 	icon: Icon = { light: 'file:../icons/composeit.svg', dark: 'file:../icons/composeit.dark.svg' };
 
-	documentationUrl = 'https://app.composeit.app/dashboard/api-keys';
+	documentationUrl = 'https://docs.composeit.app/docs/api-docs';
 
 	properties: INodeProperties[] = [
 		{
@@ -22,7 +22,8 @@ export class ComposeItApi implements ICredentialType {
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
-			description: 'Enter your API key with at least templates.read and documents.write permissions.',
+			description:
+				'Enter your API key with at least templates.read and documents.write permissions.',
 		},
 	];
 

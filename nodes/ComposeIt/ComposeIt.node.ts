@@ -355,7 +355,8 @@ export class ComposeIt implements INodeType {
 							: undefined;
 						const isTest = this.getNodeParameter('isTest', i) as boolean;
 
-						const data = this.getNodeParameter('dataFields', i) as IDataObject;
+						const data = (this.getNodeParameter('dataFields', i) as IDataObject)
+							?.value as IDataObject;
 						const inputMode = this.getNodeParameter('inputMode', i) as string;
 
 						const body: IDataObject = {

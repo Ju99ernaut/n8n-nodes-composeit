@@ -264,10 +264,6 @@ export class ComposeIt implements INodeType {
 					{
 						method: 'GET',
 						url: 'https://app.composeit.app/api/templates',
-						qs: {
-							page: 1,
-							pageSize: 100,
-						},
 						headers: {
 							Accept: 'application/json',
 						},

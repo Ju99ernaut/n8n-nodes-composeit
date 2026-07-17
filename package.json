@@ -1,11 +1,14 @@
 {
     "name": "n8n-nodes-composeit",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "n8n community node package for ComposeIt Document Generation API integrations",
     "license": "MIT",
     "homepage": "https://composeit.app",
     "keywords": [
-        "n8n-community-node-package", "documents", "emails", "automation"
+        "n8n-community-node-package",
+        "documents",
+        "emails",
+        "automation"
     ],
     "author": {
         "name": "Ju99ernaut",
@@ -15,15 +18,15 @@
         "type": "git",
         "url": "https://github.com/ju99ernaut/n8n-nodes-composeit.git"
     },
-   "scripts": {
-		"build": "n8n-node build",
-		"build:watch": "tsc --watch",
-		"dev": "n8n-node dev",
-		"lint": "n8n-node lint",
+    "scripts": {
+        "build": "n8n-node build",
+        "build:watch": "tsc --watch",
+        "dev": "n8n-node dev",
+        "lint": "n8n-node lint",
         "lint:fix": "n8n-node lint --fix",
-		"release": "n8n-node release",
-		"prepublishOnly": "n8n-node prerelease"
-	},
+        "release": "n8n-node release",
+        "prepublishOnly": "n8n-node prerelease"
+    },
     "files": [
         "dist"
     ],

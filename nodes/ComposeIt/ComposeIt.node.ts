@@ -208,6 +208,12 @@ export class ComposeIt implements INodeType {
 					{ name: 'Raw JSON (Advanced)', value: 'json' },
 				],
 				default: 'form',
+				displayOptions: {
+					show: {
+						resource: ['template'],
+						operation: ['generate'],
+					},
+				},
 				description: 'Choose how you want to input variables into your template',
 			},
 			{

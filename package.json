@@ -16,7 +16,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/ju99ernaut/n8n-nodes-composeit.git"
+        "url": "https://github.com/Ju99ernaut/n8n-nodes-composeit.git"
     },
     "scripts": {
         "build": "n8n-node build",
